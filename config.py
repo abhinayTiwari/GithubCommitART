@@ -9,7 +9,7 @@ from datetime import date
 # ─── Customizable settings ────────────────────────────────────────────────────
 
 WORD = "NASA"                  # Word to spell; supports A-Z and spaces
-START_DATE = date(2026, 5, 3)  # Must be a Sunday (May 3, 2026 is a Sunday)
+START_DATE = date(2026, 1, 4)  # Must be a Sunday (Jan 4, 2026 is a Sunday)
 COMMITS_PER_DAY = 20           # Commits on each active day (20 = max/darkest green)
 LETTER_WIDTH = 5               # Columns (weeks) wide per letter
 LETTER_SPACING = 2             # Empty columns between consecutive letters
