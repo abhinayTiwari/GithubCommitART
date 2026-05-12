@@ -23,6 +23,15 @@ AUTHOR_EMAIL = None            # Optional explicit author email; must be verifie
 # 5-wide patterns give each letter a clear diagonal (especially N, M, W, K, X).
 
 LETTERS = {
+    '@': [
+        [0, 1, 1, 1, 0],
+        [1, 0, 0, 0, 1],
+        [1, 0, 1, 1, 0],
+        [1, 0, 1, 0, 1],
+        [1, 0, 1, 1, 1],
+        [1, 0, 0, 0, 0],
+        [0, 1, 1, 1, 0],
+    ],
     'A': [
         [0, 1, 1, 1, 0],
         [1, 0, 0, 0, 1],
