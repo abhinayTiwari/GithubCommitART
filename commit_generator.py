@@ -37,6 +37,8 @@ def generate_commits(
     commits_per_day: int,
     repo_path: str,
     log_file: str = "commit_log.txt",
+    author_name: str | None = None,
+    author_email: str | None = None,
     verbose: bool = True,
 ) -> None:
     """
@@ -91,6 +93,12 @@ def generate_commits(
             env = os.environ.copy()
             env["GIT_AUTHOR_DATE"] = iso_ts
             env["GIT_COMMITTER_DATE"] = iso_ts
+            if author_name:
+                env["GIT_AUTHOR_NAME"] = author_name
+                env["GIT_COMMITTER_NAME"] = author_name
+            if author_email:
+                env["GIT_AUTHOR_EMAIL"] = author_email
+                env["GIT_COMMITTER_EMAIL"] = author_email
             _run_git(["commit", "-m", message], cwd=repo_path, env=env)
 
             done += 1

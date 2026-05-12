@@ -65,6 +65,8 @@ py -c "from datetime import date, timedelta; d=date(2026,1,4); print(d + timedel
 | `--letter-spacing` | `2` | Empty columns between letters |
 | `--word-spacing` | `4` | Empty columns for a space between words |
 | `--repo-path` | `.` | Path to the target git repo |
+| `--author-name` | current git config | Explicit author name for generated commits |
+| `--author-email` | current git config | Explicit author email for generated commits |
 | `--dry-run` | — | Preview only, no commits written |
 
 ## Customization
@@ -78,6 +80,8 @@ COMMITS_PER_DAY = 20            # 20 = darkest green on GitHub
 LETTER_WIDTH    = 5             # Columns per letter (wider = clearer)
 LETTER_SPACING  = 2             # Empty cols between letters
 WORD_SPACING    = 4             # Empty cols between words
+AUTHOR_NAME     = None          # Optional explicit author name for generated commits
+AUTHOR_EMAIL    = None          # Optional explicit author email (must be verified on GitHub)
 ```
 
 You can also add or modify letter pixel patterns in the `LETTERS` dictionary inside `config.py`. Each letter is a 7-row × 5-column grid where `1` means commit and `0` means no commit.
@@ -107,3 +111,6 @@ Yes — pass a phrase with spaces: `--word "HI WORLD"`. Each space becomes 4 emp
 
 **What if a letter looks wrong in the preview?**
 Widen the terminal window so all columns fit on one line. The preview uses `#` for active days and `.` for empty days.
+
+**I can see the commits in the repo, but not on my contribution graph. Why?**
+GitHub only credits commits to your profile when the commit author email is connected to your account and the commits land on the default branch (or `gh-pages`). By default, this tool uses your current git-configured author identity. If that email is wrong, pass `--author-email your-verified-email@example.com` or set `AUTHOR_EMAIL` in `config.py` before generating commits.

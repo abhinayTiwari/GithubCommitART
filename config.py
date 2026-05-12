@@ -14,6 +14,8 @@ COMMITS_PER_DAY = 20           # Commits on each active day (20 = max/darkest gr
 LETTER_WIDTH = 5               # Columns (weeks) wide per letter
 LETTER_SPACING = 2             # Empty columns between consecutive letters
 WORD_SPACING = 4               # Empty columns for a space character between words
+AUTHOR_NAME = None             # Optional explicit author name for generated commits
+AUTHOR_EMAIL = None            # Optional explicit author email; must be verified on GitHub
 
 # ─── Pixel font: A-Z (7 rows × 5 cols) ───────────────────────────────────────
 # Each letter is a list of 7 rows (Sun→Sat), each row is 5 pixels wide.

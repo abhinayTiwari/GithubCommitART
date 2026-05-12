@@ -17,6 +17,7 @@ Flags:
   --dry-run            Show planned commits without writing anything
 """
 import argparse
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -84,11 +85,40 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the local git repository (default: current directory).",
     )
     parser.add_argument(
+        "--author-name",
+        type=str,
+        default=config.AUTHOR_NAME,
+        metavar="TEXT",
+        help="Explicit git author name for generated commits (default: current git config).",
+    )
+    parser.add_argument(
+        "--author-email",
+        type=str,
+        default=config.AUTHOR_EMAIL,
+        metavar="EMAIL",
+        help="Explicit git author email for generated commits (default: current git config). Must be verified on GitHub.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview the commit pattern without creating any commits.",
     )
     return parser
+
+
+def _get_git_identity(repo_path: str) -> tuple[str | None, str | None]:
+    def _read(key: str) -> str | None:
+        result = subprocess.run(
+            ["git", "config", key],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        value = result.stdout.strip()
+        return value or None
+
+    return _read("user.name"), _read("user.email")
 
 
 def main() -> None:
@@ -100,6 +130,11 @@ def main() -> None:
     letter_spacing: int = args.letter_spacing
     word_spacing: int = args.word_spacing
     repo_path = str(Path(args.repo_path).resolve())
+    author_name: str | None = args.author_name
+    author_email: str | None = args.author_email
+    git_name, git_email = _get_git_identity(repo_path)
+    effective_author_name = author_name or git_name
+    effective_author_email = author_email or git_email
 
     # ── Validate unsupported characters ──────────────────────────────────────
     missing = [ch for ch in word if ch != " " and ch not in config.LETTERS]
@@ -145,6 +180,11 @@ def main() -> None:
     print(f"  Active days   : {len(commit_dates)}")
     print(f"  Commits/day   : {commits_per_day}")
     print(f"  Total commits : {total_commits}")
+    print(f"  Author name   : {effective_author_name or '[not set]'}")
+    print(f"  Author email  : {effective_author_email or '[not set]'}")
+    if not author_email:
+        print("  Note          : Using your current git-configured email for commit attribution.")
+        print("                 Set --author-email or config.AUTHOR_EMAIL to a GitHub-verified email.")
     print()
 
     # ── Dry-run mode ──────────────────────────────────────────────────────────
@@ -177,6 +217,8 @@ def main() -> None:
         commit_dates=commit_dates,
         commits_per_day=commits_per_day,
         repo_path=repo_path,
+        author_name=author_name,
+        author_email=author_email,
         verbose=True,
     )
 
