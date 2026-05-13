@@ -565,7 +565,7 @@ function snapToSunday() {
   const target = new Date(today);
   target.setDate(today.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
   input.value = toDateInputValue(target);
-  updatePreview();
+  renderGrid();
 }
 
 // ─── Grid builder ──────────────────────────────────────────────────────────
