@@ -1,6 +1,6 @@
 # GitHub Commit ART
 
-Draw pixel-art text on your GitHub contribution graph using backdated git commits. Each "lit" cell on the calendar receives 20 commits, producing the darkest green color. Empty cells stay grey, creating a readable contrast that forms the letters.
+Draw pixel-art text on your GitHub contribution graph using backdated git commits.
 
 ```
 Sun  #...#...###....###....###...
@@ -12,90 +12,86 @@ Fri  #...#..#...#..#...#..#...#..
 Sat  #...#..#...#...###...#...#..
 ```
 
+Each "lit" cell gets 20 commits (darkest green). Empty cells stay grey, forming the letters.
+
 ## How it works
 
-The GitHub contribution graph is a 7-row grid (Sunday→Saturday) that spans 52 weeks left to right. This tool maps pixel-font letters onto that grid and creates backdated git commits using git's built-in `GIT_AUTHOR_DATE` and `GIT_COMMITTER_DATE` environment variables — a standard git feature. When pushed to GitHub, the contribution graph renders the commits on their authored date, drawing the text.
+The contribution graph is a 7-row × 52-week grid. This tool maps a pixel-font onto that grid and creates backdated git commits using `GIT_AUTHOR_DATE` / `GIT_COMMITTER_DATE` — a standard git feature. Push once and GitHub renders the art on your profile.
 
-- Past dates appear immediately on your graph after pushing.
-- Future dates appear on your graph as each day arrives.
-- Your other repos and projects are completely unaffected.
+- **Past dates** appear immediately after pushing.
+- **Future dates** appear as each day arrives.
+- No third-party packages — pure Python standard library.
 
 ## Requirements
 
-- Python 3.x (Windows: use `py`, macOS/Linux: use `python3`)
+- Python 3.x
 - Git installed and configured
-- A GitHub account with a connected remote repo
+- A GitHub repo with your verified email attached
 
-No third-party packages required — pure Python standard library only.
+## Usage
 
-## Quick start
-
-```powershell
-# 1. Clone or download this repo
-git clone https://github.com/abhinayTiwari/GithubCommitART.git
-cd GithubCommitART
-
-# 2. Preview what will be drawn (no commits written)
-py main.py --start-date 2026-01-04 --word NASA --dry-run
-
-# 3. Generate the commits
-py main.py --start-date 2026-01-04 --word NASA
-
-# 4. Push to GitHub
-git push
-```
-
-## Choosing a start date
-
-The start date **must be a Sunday** — this ensures the first pixel column aligns with the top of the contribution calendar grid. The tool will warn you if you pick a non-Sunday.
-
-To find the next Sunday from any date, check a calendar or run:
+**Interactive mode** — just run with no arguments:
 
 ```powershell
-py -c "from datetime import date, timedelta; d=date(2026,1,4); print(d + timedelta(days=(6-d.weekday())%7))"
+py main.py
 ```
+
+You'll be prompted for the text, start date, and shown a preview before anything is written.
+
+**CLI mode:**
+
+```powershell
+# Preview only (no commits written)
+py main.py --word "WORKS @ NASA" --start-date 2025-02-16 --dry-run
+
+# Generate and auto-push
+py main.py --word "WORKS @ NASA" --start-date 2025-02-16
+
+# Generate without pushing
+py main.py --word "WORKS @ NASA" --start-date 2025-02-16 --no-push
+```
+
+> **Start date must be a Sunday.** This aligns the first column with the top of the contribution calendar.
 
 ## Options
 
 | Flag | Default | Description |
 |---|---|---|
-| `--word` | `NASA` | Word to draw — uppercase A-Z and spaces only |
-| `--start-date` | `2026-05-03` | Start date — **must be a Sunday** |
+| `--word` | `NASA` | Text to draw (A–Z, 0–9, most punctuation) |
+| `--start-date` | config value | Start date — **must be a Sunday** |
 | `--commits` | `20` | Commits per active day (20 = darkest green) |
 | `--letter-spacing` | `2` | Empty columns between letters |
-| `--word-spacing` | `4` | Empty columns for a space between words |
+| `--word-spacing` | `4` | Empty columns between words |
 | `--repo-path` | `.` | Path to the target git repo |
-| `--author-name` | current git config | Explicit author name for generated commits |
-| `--author-email` | current git config | Explicit author email for generated commits |
+| `--author-name` | git config | Override commit author name |
+| `--author-email` | git config | Override commit author email (must be GitHub-verified) |
 | `--dry-run` | — | Preview only, no commits written |
+| `--no-push` | — | Generate commits but skip the push |
 
-## Customization
+## Configuration
 
-Change the defaults permanently in `config.py`:
+Edit `config.py` to change defaults:
 
 ```python
-WORD            = "NASA"        # Word to draw
+WORD            = "NASA"
 START_DATE      = date(2026, 1, 4)
-COMMITS_PER_DAY = 20            # 20 = darkest green on GitHub
-LETTER_WIDTH    = 5             # Columns per letter (wider = clearer)
-LETTER_SPACING  = 2             # Empty cols between letters
-WORD_SPACING    = 4             # Empty cols between words
-AUTHOR_NAME     = None          # Optional explicit author name for generated commits
-AUTHOR_EMAIL    = None          # Optional explicit author email (must be verified on GitHub)
+COMMITS_PER_DAY = 20        # 20 = darkest green
+LETTER_WIDTH    = 5
+LETTER_SPACING  = 2
+WORD_SPACING    = 4
+AUTHOR_NAME     = None      # falls back to git config
+AUTHOR_EMAIL    = None      # must be a GitHub-verified email
 ```
-
-You can also add or modify letter pixel patterns in the `LETTERS` dictionary inside `config.py`. Each letter is a 7-row × 5-column grid where `1` means commit and `0` means no commit.
 
 ## File structure
 
 ```
 GithubCommitART/
 ├── main.py               # CLI entry point
-├── config.py             # Settings and A-Z pixel font definitions
-├── calendar_mapper.py    # Maps letters to calendar dates
+├── config.py             # Settings and pixel font (A–Z, 0–9, symbols)
+├── calendar_mapper.py    # Maps letters → calendar dates
 ├── commit_generator.py   # Creates backdated git commits
-├── requirements.txt      # No external dependencies
-└── commit_log.txt        # Auto-created; the file modified by each commit
+└── commit_log.txt        # Auto-created; modified by each commit
 ```
 
 ## FAQ

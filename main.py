@@ -1,20 +1,25 @@
 """
 main.py — GitHub Commit Art
 
-Usage examples:
-  python main.py --dry-run                    # preview default word "NASA"
-  python main.py --dry-run --word HELLO       # preview a different word
-  python main.py                              # generate commits for "NASA"
-  python main.py --word HELLO --commits 15   # custom word, 15 commits/day
-  python main.py --start-date 2026-06-01     # different start date (must be Sunday)
+Run with no arguments for interactive mode (recommended):
+  python main.py
+
+Or use flags directly:
+  python main.py --dry-run                       # preview default word
+  python main.py --word "HELLO WORLD" --dry-run  # preview a custom phrase
+  python main.py --word "HI" --start-date 2026-01-04  # generate + push
 
 Flags:
-  --word TEXT          Word to spell (default from config.py: NASA)
-  --start-date DATE    Start date in YYYY-MM-DD format; must be a Sunday
+  --word TEXT          Text to spell (A-Z, 0-9, symbols; default from config.py)
+  --start-date DATE    Start date YYYY-MM-DD; must be a Sunday
   --commits N          Commits per active day (default 20)
-  --spacing N          Empty columns between letters (default 3)
+  --letter-spacing N   Empty columns between letters (default 2)
+  --word-spacing N     Columns for a space between words (default 4)
   --repo-path PATH     Path to git repo (default: current directory)
-  --dry-run            Show planned commits without writing anything
+  --author-name TEXT   Override git author name
+  --author-email EMAIL Override git author email (must be verified on GitHub)
+  --no-push            Skip the automatic git push after generating commits
+  --dry-run            Preview commit pattern without writing anything
 """
 import argparse
 import subprocess
@@ -99,6 +104,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Explicit git author email for generated commits (default: current git config). Must be verified on GitHub.",
     )
     parser.add_argument(
+        "--no-push",
+        action="store_true",
+        help="Skip the automatic git push after generating commits.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview the commit pattern without creating any commits.",
@@ -121,11 +131,88 @@ def _get_git_identity(repo_path: str) -> tuple[str | None, str | None]:
     return _read("user.name"), _read("user.email")
 
 
+def _supported_chars_hint() -> str:
+    specials = sorted(k for k in config.LETTERS if not k.isalpha())
+    return f"A-Z, 0-9, and: {'  '.join(specials)}"
+
+
+def _interactive_prompt() -> tuple[str, date]:
+    """Ask the user for the text and start date interactively."""
+    print()
+    print("  GitHub Commit Art — Interactive Setup")
+    print(f"  Supported characters: {_supported_chars_hint()}")
+    print()
+
+    while True:
+        raw_word = input("  Text to display: ").strip()
+        if not raw_word:
+            print("  Text cannot be empty.")
+            continue
+        missing = [ch for ch in raw_word.upper() if ch != " " and ch not in config.LETTERS]
+        if missing:
+            print(f"  Unsupported characters: {sorted(set(missing))}")
+            print(f"  Supported: {_supported_chars_hint()}")
+            continue
+        break
+
+    print()
+    while True:
+        raw_date = input("  Start date (YYYY-MM-DD, must be a Sunday): ").strip()
+        try:
+            d = date.fromisoformat(raw_date)
+        except ValueError:
+            print("  Invalid format. Use YYYY-MM-DD (e.g. 2026-01-04).")
+            continue
+        if d.weekday() != 6:
+            print(f"  {d} is a {d.strftime('%A')}, not a Sunday. Please pick a Sunday.")
+            continue
+        break
+
+    print()
+    return raw_word, d
+
+
+def _current_branch(repo_path: str) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() or "master"
+
+
+def _git_push(repo_path: str) -> None:
+    branch = _current_branch(repo_path)
+    print(f"  Pushing to GitHub (origin/{branch})…")
+    result = subprocess.run(
+        ["git", "push", "origin", branch],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    output = (result.stdout + result.stderr).strip()
+    if output:
+        for line in output.splitlines():
+            print(f"    {line}")
+    if result.returncode == 0:
+        print("  Pushed successfully! GitHub will update within 10–15 minutes.")
+    else:
+        print(f"  [Warning] Push failed. Run manually: git push origin {branch}")
+
+
 def main() -> None:
+    interactive = len(sys.argv) == 1
     args = _build_parser().parse_args()
 
-    word = args.word.upper()
-    start_date: date = args.start_date
+    if interactive:
+        word, start_date = _interactive_prompt()
+        word = word.upper()
+    else:
+        word = args.word.upper()
+        start_date: date = args.start_date
     commits_per_day: int = args.commits
     letter_spacing: int = args.letter_spacing
     word_spacing: int = args.word_spacing
@@ -141,7 +228,7 @@ def main() -> None:
     if missing:
         unique = sorted(set(missing))
         print(f"  [Error] Unsupported characters: {unique}")
-        print("  Supported characters: A-Z and spaces.")
+        print(f"  Supported: {_supported_chars_hint()}")
         sys.exit(1)
 
     # ── Warn if start date is not a Sunday ────────────────────────────────────
@@ -198,13 +285,22 @@ def main() -> None:
         return
 
     # ── Confirm before writing ────────────────────────────────────────────────
+    # In interactive mode the preview was already shown above; ask if they want
+    # to proceed or restart. In CLI mode just show the repository and confirm.
     print(f"  Repository    : {repo_path}")
     print()
-    try:
-        confirm = input("  This will create commits with backdated timestamps. Proceed? [y/N] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print("\n  Aborted.")
-        sys.exit(0)
+    if interactive:
+        try:
+            confirm = input("  Looks good? Proceed with generating commits? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  Aborted.")
+            sys.exit(0)
+    else:
+        try:
+            confirm = input("  This will create commits with backdated timestamps. Proceed? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  Aborted.")
+            sys.exit(0)
 
     if confirm != "y":
         print("  Aborted.")
@@ -224,8 +320,13 @@ def main() -> None:
 
     print()
     print("  All commits created successfully!")
-    print("  Next: run  git push  to send them to GitHub.")
-    print("  Your contributions calendar should update within 24–48 hours.")
+    print()
+
+    # ── Push to GitHub ────────────────────────────────────────────────────────
+    if not args.no_push:
+        _git_push(repo_path)
+    else:
+        print("  Skipping push (--no-push). Run: git push origin master")
 
 
 if __name__ == "__main__":
