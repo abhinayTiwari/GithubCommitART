@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitHub Commit Art — Live Preview</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0d1117;
+      --surface:      #161b22;
+      --surface2:     #21262d;
+      --border:       #30363d;
+      --text:         #e6edf3;
+      --text-muted:   #8b949e;
+      --green:        #39d353;
+      --green-dark:   #2ea043;
+      --cell-empty:   #21262d;
+      --cell-lit:     #39d353;
+      --accent:       #238636;
+      --error:        #f85149;
+      --radius:       6px;
+      --font:         -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:         #ffffff;
+        --surface:    #f6f8fa;
+        --surface2:   #eaeef2;
+        --border:     #d0d7de;
+        --text:       #1f2328;
+        --text-muted: #57606a;
+        --cell-empty: #ebedf0;
+        --cell-lit:   #39d353;
+        --accent:     #1a7f37;
+      }
+    }
+
+    body {
+      font-family: var(--font);
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 16px 64px;
+    }
+
+    header {
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: var(--text-muted);
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      fill: var(--text);
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ────────────────────────────────────────────────────────────── */
+    .field { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    label small {
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"] {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 14px;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color .15s;
+      color-scheme: dark light;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    .date-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .date-row input { flex: 1; }
+
+    .btn-snap {
+      padding: 7px 12px;
+      font-size: 13px;
+      font-family: var(--font);
+      white-space: nowrap;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background .1s;
+    }
+
+    .btn-snap:hover { background: var(--border); }
+
+    .field-error {
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--error);
+      display: none;
+    }
+
+    .field-error.visible { display: block; }
+
+    /* Advanced toggle */
+    details { margin-top: 12px; }
+
+    summary {
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-muted);
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    summary::before {
+      content: "▶";
+      font-size: 10px;
+      transition: transform .15s;
+      display: inline-block;
+    }
+
+    details[open] summary::before { transform: rotate(90deg); }
+
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 480px) {
+      .advanced-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── Preview area ────────────────────────────────────────────────────── */
+    .preview-wrapper {
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .graph-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: max-content;
+    }
+
+    .day-labels {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .day-labels span {
+      height: 14px;
+      line-height: 14px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+      min-width: 28px;
+    }
+
+    .contrib-grid {
+      display: grid;
+      grid-template-rows: repeat(7, 14px);
+      grid-auto-flow: column;
+      gap: 3px;
+    }
+
+    .cell {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--cell-empty);
+    }
+
+    .cell.lit { background: var(--cell-lit); }
+
+    .preview-info {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .preview-info span { display: flex; gap: 4px; align-items: center; }
+
+    .dot-green {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: var(--cell-lit);
+      border-radius: 2px;
+    }
+
+    .dot-gray {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: var(--cell-empty);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+    }
+
+    .unsupported-msg {
+      color: var(--error);
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    /* ── CTA section ─────────────────────────────────────────────────────── */
+    .steps ol {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .steps li {
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .steps code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 13px;
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      padding: 9px 18px;
+      font-size: 14px;
+      font-family: var(--font);
+      font-weight: 600;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .15s;
+    }
+
+    .btn-primary:hover { opacity: .88; }
+
+    .badge-tip {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <h1>
+      <svg class="logo-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+                 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+                 -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+                 .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+                 -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27
+                 .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12
+                 .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
+                 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      GitHub Commit Art
+    </h1>
+    <p>Design pixel-text for your contribution graph — then draw it in one click via GitHub Actions.</p>
+  </header>
+
+  <!-- ── Step 1: Configure ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">1 · Configure your art</div>
+
+    <div class="field">
+      <label for="word">Text to draw <small>A–Z · 0–9 · symbols like @ ! # $ % &amp; * + - . ? _</small></label>
+      <input type="text" id="word" value="HELLO" placeholder="e.g. HELLO WORLD" autocomplete="off" spellcheck="false" />
+      <div class="field-error" id="word-error"></div>
+    </div>
+
+    <div class="field">
+      <label for="start-date">Start date <small>must be a Sunday — GitHub's calendar columns begin on Sunday</small></label>
+      <div class="date-row">
+        <input type="date" id="start-date" />
+        <button class="btn-snap" onclick="snapToSunday()" title="Move to the nearest upcoming Sunday">Next Sunday →</button>
+      </div>
+      <div class="field-error" id="date-error">That date is not a Sunday. Please pick a Sunday.</div>
+    </div>
+
+    <details>
+      <summary>Advanced options</summary>
+      <div class="advanced-grid">
+        <div class="field">
+          <label for="commits">Commits / day <small>max 20</small></label>
+          <input type="number" id="commits" value="20" min="1" max="20" />
+        </div>
+        <div class="field">
+          <label for="ltr-spacing">Letter spacing</label>
+          <input type="number" id="ltr-spacing" value="2" min="0" max="8" />
+        </div>
+        <div class="field">
+          <label for="wrd-spacing">Word spacing</label>
+          <input type="number" id="wrd-spacing" value="4" min="1" max="12" />
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ── Step 2: Preview ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">2 · Live preview</div>
+    <div class="preview-wrapper">
+      <div class="graph-row">
+        <div class="day-labels">
+          <span>Sun</span><span>Mon</span><span>Tue</span>
+          <span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div id="grid-container">
+          <!-- grid rendered by JS -->
+        </div>
+      </div>
+    </div>
+    <div class="preview-info" id="preview-info"></div>
+    <div class="unsupported-msg" id="unsupported-msg"></div>
+  </div>
+
+  <!-- ── Step 3: Draw it ───────────────────────────────────────────────── -->
+  <div class="card steps">
+    <div class="card-title">3 · Draw it on your profile</div>
+    <span class="badge-tip">No local setup needed — runs entirely on GitHub</span>
+    <ol>
+      <li>
+        <strong>Get your own copy</strong> — click <em>"Use this template"</em> (or fork) on
+        <a id="repo-link" href="https://github.com/abhinayTiwari/GithubCommitART" target="_blank">the repo</a>
+        to create a private copy under your account.
+      </li>
+      <li>
+        <strong>Enable Actions</strong> — in your new repo go to <em>Settings → Actions → General</em> and
+        set <em>Workflow permissions</em> to <strong>Read and write</strong>.
+      </li>
+      <li>
+        <strong>Run the workflow</strong> — go to <em>Actions → "Draw Commit Art" → Run workflow</em>,
+        fill in the same values you configured above, and click <em>Run workflow</em>.
+        Use your GitHub verified email so commits appear on your graph.
+      </li>
+      <li>
+        <strong>Wait ~10 min</strong> — GitHub processes the new commits and your contribution graph updates automatically.
+      </li>
+    </ol>
+
+    <a id="actions-link" class="btn-primary" href="https://github.com/abhinayTiwari/GithubCommitART/actions/workflows/draw-commit-art.yml" target="_blank">
+      <!-- arrow icon -->
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM8 5.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
+      </svg>
+      Open GitHub Actions →
+    </a>
+  </div>
+
+  <footer>
+    <p>
+      <a href="https://github.com/abhinayTiwari/GithubCommitART" target="_blank">abhinayTiwari/GithubCommitART</a>
+      &nbsp;·&nbsp; Backdating commits is a standard git feature — no third-party access or tokens required.
+    </p>
+  </footer>
+</div>
+
+<script>
+// ─── Pixel font (7 rows × 5 cols per character) ────────────────────────────
+// Exactly mirrors config.py — 1 = commit (green cell), 0 = empty cell.
+const LETTERS = {
+  '@': [[0,1,1,1,0],[1,0,0,0,1],[1,0,1,1,0],[1,0,1,0,1],[1,0,1,1,1],[1,0,0,0,0],[0,1,1,1,0]],
+  'A': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  'B': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0]],
+  'C': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,1],[0,1,1,1,0]],
+  'D': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0]],
+  'E': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+  'F': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0]],
+  'G': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,0],[1,0,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,1]],
+  'H': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  'I': [[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1]],
+  'J': [[0,0,1,1,1],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0],[0,1,1,0,0]],
+  'K': [[1,0,0,0,1],[1,0,0,1,0],[1,0,1,0,0],[1,1,0,0,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+  'L': [[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+  'M': [[1,0,0,0,1],[1,1,0,1,1],[1,0,1,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  'N': [[1,0,0,0,1],[1,1,0,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,0,0,1,1],[1,0,0,0,1],[1,0,0,0,1]],
+  'O': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  'P': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0]],
+  'Q': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[1,0,0,1,0],[0,1,1,0,1]],
+  'R': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+  'S': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,0],[0,1,1,1,0],[0,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  'T': [[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+  'U': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  'V': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,0,1,0],[0,1,0,1,0],[0,0,1,0,0]],
+  'W': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,1,0,1,1],[0,1,0,1,0]],
+  'X': [[1,0,0,0,1],[0,1,0,1,0],[0,1,0,1,0],[0,0,1,0,0],[0,1,0,1,0],[0,1,0,1,0],[1,0,0,0,1]],
+  'Y': [[1,0,0,0,1],[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+  'Z': [[1,1,1,1,1],[0,0,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+  // Digits
+  '0': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,1,1],[1,0,1,0,1],[1,1,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  '1': [[0,0,1,0,0],[0,1,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,1,1,0]],
+  '2': [[0,1,1,1,0],[1,0,0,0,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[1,1,1,1,1]],
+  '3': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,0,0,0,1],[0,0,1,1,0],[0,0,0,0,1],[0,1,1,1,0]],
+  '4': [[0,0,0,1,0],[0,0,1,1,0],[0,1,0,1,0],[1,0,0,1,0],[1,1,1,1,1],[0,0,0,1,0],[0,0,0,1,0]],
+  '5': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[0,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  '6': [[0,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  '7': [[1,1,1,1,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0]],
+  '8': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  '9': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]],
+  // Punctuation & symbols
+  '!': [[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0],[0,0,1,0,0]],
+  '"': [[0,1,0,1,0],[0,1,0,1,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+  '#': [[0,1,0,1,0],[0,1,0,1,0],[1,1,1,1,1],[0,1,0,1,0],[1,1,1,1,1],[0,1,0,1,0],[0,1,0,1,0]],
+  '$': [[0,0,1,0,0],[0,1,1,1,1],[1,0,1,0,0],[0,1,1,1,0],[0,0,1,0,1],[1,1,1,1,0],[0,0,1,0,0]],
+  '%': [[1,1,0,0,1],[1,1,0,1,0],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[0,1,0,1,1],[1,0,0,1,1]],
+  '&': [[0,1,1,0,0],[1,0,0,1,0],[1,0,0,1,0],[0,1,1,0,0],[1,0,1,0,1],[1,0,0,1,0],[0,1,1,0,1]],
+  "'": [[0,0,1,0,0],[0,0,1,0,0],[0,1,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+  '(': [[0,0,1,1,0],[0,1,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,1,0,0,0],[0,0,1,1,0]],
+  ')': [[0,1,1,0,0],[0,0,0,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,1,0],[0,1,1,0,0]],
+  '*': [[0,0,0,0,0],[0,1,0,1,0],[0,0,1,0,0],[1,1,1,1,1],[0,0,1,0,0],[0,1,0,1,0],[0,0,0,0,0]],
+  '+': [[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0]],
+  ',': [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,0,0,0]],
+  '-': [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+  '.': [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,0]],
+  '/': [[0,0,0,0,1],[0,0,0,1,0],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[0,1,0,0,0],[1,0,0,0,0]],
+  ':': [[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0]],
+  ';': [[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,0,0,0]],
+  '<': [[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[1,0,0,0,0],[0,1,0,0,0],[0,0,1,0,0],[0,0,0,1,0]],
+  '=': [[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0],[0,0,0,0,0]],
+  '>': [[0,1,0,0,0],[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0]],
+  '?': [[0,1,1,1,0],[1,0,0,0,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,0,0,0,0],[0,0,1,0,0]],
+  '[': [[0,1,1,1,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,1,1,0]],
+  '\\':[[1,0,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,0,1,0,0],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,0,1]],
+  ']': [[0,1,1,1,0],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0],[0,1,1,1,0]],
+  '^': [[0,0,1,0,0],[0,1,0,1,0],[1,0,0,0,1],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+  '_': [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1]],
+  '`': [[0,1,0,0,0],[0,0,1,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+  '{': [[0,0,1,1,0],[0,1,0,0,0],[0,1,0,0,0],[1,0,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,0,1,1,0]],
+  '|': [[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+  '}': [[0,1,1,0,0],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,0,1],[0,0,0,1,0],[0,0,0,1,0],[0,1,1,0,0]],
+  '~': [[0,0,0,0,0],[0,0,0,0,0],[0,1,0,0,0],[1,0,1,0,1],[0,0,0,1,0],[0,0,0,0,0],[0,0,0,0,0]],
+};
+
+const LETTER_WIDTH  = 5;
+const DAY_LABELS    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function isSunday(dateStr) {
+  if (!dateStr) return false;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === 0;
+}
+
+function toDateInputValue(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + n);
+  return toDateInputValue(dt);
+}
+
+function formatDateLong(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+}
+
+function snapToSunday() {
+  const input = document.getElementById('start-date');
+  const today = new Date();
+  const daysUntilSunday = (7 - today.getDay()) % 7;
+  const target = new Date(today);
+  target.setDate(today.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
+  input.value = toDateInputValue(target);
+  updatePreview();
+}
+
+// ─── Grid builder ──────────────────────────────────────────────────────────
+
+function buildGrid(word, ltrSpacing, wrdSpacing) {
+  let totalCols = 0;
+  const upper = word.toUpperCase();
+
+  for (const ch of upper) {
+    if (ch === ' ')             totalCols += wrdSpacing;
+    else if (LETTERS[ch])       totalCols += LETTER_WIDTH + ltrSpacing;
+  }
+
+  if (totalCols === 0) return { grid: [], totalCols: 0, unsupported: [] };
+
+  const grid = Array.from({length: 7}, () => new Array(totalCols).fill(0));
+  const unsupported = [];
+  let cursor = 0;
+
+  for (const ch of upper) {
+    if (ch === ' ') {
+      cursor += wrdSpacing;
+    } else if (LETTERS[ch]) {
+      const lGrid = LETTERS[ch];
+      for (let row = 0; row < Math.min(7, lGrid.length); row++) {
+        for (let col = 0; col < LETTER_WIDTH; col++) {
+          if (lGrid[row][col] && cursor + col < totalCols) {
+            grid[row][cursor + col] = 1;
+          }
+        }
+      }
+      cursor += LETTER_WIDTH + ltrSpacing;
+    } else {
+      if (!unsupported.includes(ch)) unsupported.push(ch);
+    }
+  }
+
+  return { grid, totalCols, unsupported };
+}
+
+// ─── Render ────────────────────────────────────────────────────────────────
+
+function renderGrid() {
+  const wordInput  = document.getElementById('word');
+  const dateInput  = document.getElementById('start-date');
+  const wordErr    = document.getElementById('word-error');
+  const dateErr    = document.getElementById('date-error');
+  const infoEl     = document.getElementById('preview-info');
+  const unsupEl    = document.getElementById('unsupported-msg');
+  const container  = document.getElementById('grid-container');
+
+  const word        = wordInput.value.trim();
+  const dateStr     = dateInput.value;
+  const ltrSpacing  = Math.max(0, parseInt(document.getElementById('ltr-spacing').value) || 2);
+  const wrdSpacing  = Math.max(1, parseInt(document.getElementById('wrd-spacing').value) || 4);
+
+  // Validate date
+  const dateBad = dateStr && !isSunday(dateStr);
+  dateErr.classList.toggle('visible', dateBad);
+  dateInput.style.borderColor = dateBad ? 'var(--error)' : '';
+
+  // Build grid
+  container.innerHTML = '';
+  infoEl.innerHTML    = '';
+  unsupEl.textContent = '';
+
+  if (!word) return;
+
+  const { grid, totalCols, unsupported } = buildGrid(word, ltrSpacing, wrdSpacing);
+
+  if (unsupported.length) {
+    unsupEl.textContent = `Unsupported characters (skipped): ${unsupported.map(c => `'${c}'`).join(', ')}`;
+  }
+
+  if (totalCols === 0) return;
+
+  // Create CSS grid
+  const gridEl = document.createElement('div');
+  gridEl.className = 'contrib-grid';
+
+  // Fill column-major (col 0 all rows, col 1 all rows, …) to match grid-auto-flow: column
+  for (let col = 0; col < totalCols; col++) {
+    for (let row = 0; row < 7; row++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (grid[row][col] ? ' lit' : '');
+      gridEl.appendChild(cell);
+    }
+  }
+
+  container.appendChild(gridEl);
+
+  // Info bar
+  const litCount = grid.flat().filter(Boolean).length;
+
+  let infoHTML = `
+    <span><span class="dot-green"></span> ${litCount} active day${litCount !== 1 ? 's' : ''}</span>
+    <span><span class="dot-gray"></span> ${totalCols} week${totalCols !== 1 ? 's' : ''} wide</span>`;
+
+  if (dateStr && isSunday(dateStr)) {
+    const endStr = addDays(dateStr, totalCols * 7 - 1);
+    infoHTML += `<span>📅 ${formatDateLong(dateStr)} → ${formatDateLong(endStr)}</span>`;
+  }
+
+  infoEl.innerHTML = infoHTML;
+}
+
+// ─── Actions deep-link ─────────────────────────────────────────────────────
+// If this page is served from GitHub Pages (username.github.io/repo/),
+// derive the Actions workflow URL automatically.
+
+function setupActionsLink() {
+  const hostname = window.location.hostname;
+  const m = hostname.match(/^([^.]+)\.github\.io$/);
+  if (!m) return;
+
+  const username  = m[1];
+  const pathParts = window.location.pathname.replace(/\/$/, '').split('/').filter(Boolean);
+  const repo      = pathParts[0];
+  if (!repo) return;
+
+  const base = `https://github.com/${username}/${repo}`;
+  document.getElementById('repo-link').href    = base;
+  document.getElementById('actions-link').href = `${base}/actions/workflows/draw-commit-art.yml`;
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupActionsLink();
+  snapToSunday();
+
+  const ids = ['word', 'start-date', 'ltr-spacing', 'wrd-spacing', 'commits'];
+  ids.forEach(id => {
+    document.getElementById(id)?.addEventListener('input', renderGrid);
+    document.getElementById(id)?.addEventListener('change', renderGrid);
+  });
+});
+</script>
+</body>
+</html>

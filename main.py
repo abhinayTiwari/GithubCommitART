@@ -113,6 +113,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Preview the commit pattern without creating any commits.",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt (useful for CI / GitHub Actions).",
+    )
     return parser
 
 
@@ -269,9 +274,6 @@ def main() -> None:
     print(f"  Total commits : {total_commits}")
     print(f"  Author name   : {effective_author_name or '[not set]'}")
     print(f"  Author email  : {effective_author_email or '[not set]'}")
-    if not author_email:
-        print("  Note          : Using your current git-configured email for commit attribution.")
-        print("                 Set --author-email or config.AUTHOR_EMAIL to a GitHub-verified email.")
     print()
 
     # ── Dry-run mode ──────────────────────────────────────────────────────────
@@ -289,11 +291,16 @@ def main() -> None:
     # to proceed or restart. In CLI mode just show the repository and confirm.
     print(f"  Repository    : {repo_path}")
     print()
-    if interactive:
+    if args.yes:
+        print("  --yes flag set; skipping confirmation prompt.")
+    elif interactive:
         try:
             confirm = input("  Looks good? Proceed with generating commits? [y/N] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\n  Aborted.")
+            sys.exit(0)
+        if confirm != "y":
+            print("  Aborted.")
             sys.exit(0)
     else:
         try:
@@ -301,10 +308,9 @@ def main() -> None:
         except (EOFError, KeyboardInterrupt):
             print("\n  Aborted.")
             sys.exit(0)
-
-    if confirm != "y":
-        print("  Aborted.")
-        sys.exit(0)
+        if confirm != "y":
+            print("  Aborted.")
+            sys.exit(0)
 
     print()
 
@@ -313,8 +319,8 @@ def main() -> None:
         commit_dates=commit_dates,
         commits_per_day=commits_per_day,
         repo_path=repo_path,
-        author_name=author_name,
-        author_email=author_email,
+        author_name=effective_author_name,
+        author_email=effective_author_email,
         verbose=True,
     )
 

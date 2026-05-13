@@ -1,0 +1,141 @@
+name: Draw Commit Art
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggered manually from the GitHub Actions UI (Actions → Draw Commit Art →
+# Run workflow).  Fill in the form, click Run, and the art appears on your
+# contribution graph after the run completes.
+#
+# IMPORTANT:
+#   • author_email must be a verified email address on your GitHub account.
+#   • start_date must fall on a Sunday (GitHub's calendar starts columns on Sun).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      word:
+        description: >
+          Text to draw — supports A–Z, 0–9 and symbols like ! @ # $ % & * + - . / ? _
+        required: true
+        default: "HELLO"
+
+      start_date:
+        description: >
+          Start date YYYY-MM-DD — MUST be a Sunday
+          (e.g. 2025-01-05).  Use the preview page to find a good date.
+        required: true
+
+      author_name:
+        description: >
+          Your GitHub display name (exactly as shown on your profile)
+        required: true
+
+      author_email:
+        description: >
+          Your GitHub verified email address — commits must use this email
+          to appear on your contribution graph
+        required: true
+
+      commits_per_day:
+        description: >
+          Commits per active cell (1–20). 10 or more = darkest green.
+        required: false
+        default: "20"
+
+      letter_spacing:
+        description: "Empty columns between letters (default: 2)"
+        required: false
+        default: "2"
+
+      word_spacing:
+        description: "Empty columns for a space between words (default: 4)"
+        required: false
+        default: "4"
+
+      dry_run:
+        description: "Preview only — print the calendar but do NOT create any commits"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # needed to push the backdated commits
+
+jobs:
+  draw:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use the built-in token so the workflow can push commits back.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python ────────────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── 3. Git identity ──────────────────────────────────────────────────────
+      # Store inputs in env vars first to avoid shell-injection via the UI fields.
+      - name: Configure git identity
+        env:
+          AUTHOR_NAME:  ${{ github.event.inputs.author_name }}
+          AUTHOR_EMAIL: ${{ github.event.inputs.author_email }}
+        run: |
+          git config user.name  "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
+
+      # ── 4a. Dry run (preview only) ───────────────────────────────────────────
+      - name: Preview commit art (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        env:
+          WORD:           ${{ github.event.inputs.word }}
+          START_DATE:     ${{ github.event.inputs.start_date }}
+          COMMITS:        ${{ github.event.inputs.commits_per_day }}
+          LTR_SPACING:    ${{ github.event.inputs.letter_spacing }}
+          WRD_SPACING:    ${{ github.event.inputs.word_spacing }}
+          AUTHOR_NAME:    ${{ github.event.inputs.author_name }}
+          AUTHOR_EMAIL:   ${{ github.event.inputs.author_email }}
+        run: |
+          python main.py \
+            --word           "$WORD"        \
+            --start-date     "$START_DATE"  \
+            --commits        "$COMMITS"     \
+            --letter-spacing "$LTR_SPACING" \
+            --word-spacing   "$WRD_SPACING" \
+            --author-name    "$AUTHOR_NAME" \
+            --author-email   "$AUTHOR_EMAIL" \
+            --dry-run
+
+      # ── 4b. Generate commits ─────────────────────────────────────────────────
+      - name: Generate backdated commits
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          WORD:           ${{ github.event.inputs.word }}
+          START_DATE:     ${{ github.event.inputs.start_date }}
+          COMMITS:        ${{ github.event.inputs.commits_per_day }}
+          LTR_SPACING:    ${{ github.event.inputs.letter_spacing }}
+          WRD_SPACING:    ${{ github.event.inputs.word_spacing }}
+          AUTHOR_NAME:    ${{ github.event.inputs.author_name }}
+          AUTHOR_EMAIL:   ${{ github.event.inputs.author_email }}
+        run: |
+          python main.py \
+            --word           "$WORD"        \
+            --start-date     "$START_DATE"  \
+            --commits        "$COMMITS"     \
+            --letter-spacing "$LTR_SPACING" \
+            --word-spacing   "$WRD_SPACING" \
+            --author-name    "$AUTHOR_NAME" \
+            --author-email   "$AUTHOR_EMAIL" \
+            --no-push \
+            --yes
+
+      # ── 5. Push ──────────────────────────────────────────────────────────────
+      - name: Push commits to GitHub
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: git push origin "HEAD:${{ github.ref_name }}"
