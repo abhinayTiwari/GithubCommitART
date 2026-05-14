@@ -81,6 +81,9 @@ def word_to_commit_dates(
             for pixel_col, pixel in enumerate(row):
                 if pixel == 1:
                     week_col = col_offset + pixel_col
+                    # Ensure week_col is not negative and within grid
+                    if week_col < 0:
+                        continue
                     day_offset = week_col * 7 + row_index
                     target_date = start_date + timedelta(days=day_offset)
                     label = f"{char}[row={row_index},col={pixel_col}]"
@@ -135,7 +138,9 @@ def preview_calendar(
         for row_index, row in enumerate(letter_grid):
             for pixel_col, pixel in enumerate(row):
                 if pixel == 1:
-                    grid[row_index][col_offset + pixel_col] = "#"
+                    week_col = col_offset + pixel_col
+                    if 0 <= week_col < total_cols:
+                        grid[row_index][week_col] = "#"
 
     commits_per_day = config.COMMITS_PER_DAY
     print(f"\n  Preview: '{word}'  (start: {start_date}  |  '#' = {commits_per_day} commits/day)")
