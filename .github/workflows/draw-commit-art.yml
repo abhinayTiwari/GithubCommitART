@@ -135,7 +135,12 @@ jobs:
             --no-push \
             --yes
 
-      # ── 5. Push ──────────────────────────────────────────────────────────────
+      # ── 5. Pull latest changes ───────────────────────────────────────────────
+      - name: Pull latest changes from remote
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: git pull --rebase origin "${{ github.ref_name }}"
+
+      # ── 6. Push ──────────────────────────────────────────────────────────────
       - name: Push commits to GitHub
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: git push origin "HEAD:${{ github.ref_name }}"
